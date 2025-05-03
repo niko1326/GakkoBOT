@@ -27,7 +27,7 @@ def send_telegram_notification(message):
 
 def get_page_content():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, slow_mo=200)
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
 
