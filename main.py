@@ -16,7 +16,8 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 URL_LOGIN = "https://gakko.pjwstk.edu.pl/"
 URL_TARGET = "https://gakko.pjwstk.edu.pl/edux/8656/grades"
-CHECK_INTERVAL = 900  # 15 minutes
+CHECK_INTERVAL = 300        # 5 minutes
+HEARTBEAT_INTERVAL = 43200  # 12 hours
 
 def send_telegram_notification(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -68,6 +69,8 @@ def main():
     except FileNotFoundError:
         last_hash = ""
 
+    last_heartbeat = time.time()
+
     while True:
         try:
             content = get_page_content()
@@ -86,6 +89,11 @@ def main():
                 last_hash = current_hash
             else:
                 print("✅ No new grade detected.")
+
+            # Send heartbeat if enough time passed
+            if time.time() - last_heartbeat > HEARTBEAT_INTERVAL:
+                send_telegram_notification("📡 Bot is still running. No new grades yet.")
+                last_heartbeat = time.time()
 
         except Exception:
             error_message = f"⚠️ Error:\n{traceback.format_exc()}"
