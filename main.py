@@ -3,6 +3,7 @@ import os
 import hashlib
 import requests
 import traceback
+import re
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
@@ -25,40 +26,40 @@ def send_telegram_notification(message):
     except Exception as e:
         print("Failed to send Telegram notification:", e)
 
+def clean_content(html):
+    # Remove dynamic timestamps like "02.04.2025 10:11"
+    return re.sub(r"\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}", "", html)
+
 def get_page_content():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
 
-        # Go to login page
+        # Login
         page.goto(URL_LOGIN)
-
-        # Wait for username field to appear
         page.wait_for_selector("#userNameInput")
-
-        # Fill login fields
         page.fill("#userNameInput", USERNAME)
         page.fill("#passwordInput", PASSWORD)
-
-        # Click "Sign in" by evaluating JavaScript that triggers login
         page.evaluate("AppendUPN(); Login.submitLoginRequest();")
-
-        # Wait for redirection to complete (you may want to increase this)
         page.wait_for_timeout(5000)
 
-        # Go to the grades page
+        # Navigate to grades
         page.goto(URL_TARGET)
         page.wait_for_timeout(3000)
 
-        # Get full HTML content
-        content = page.content()
+        # Grab all grade blocks
+        grade_blocks = page.locator(".kt-widget--user-profile-3")
+        all_html = ""
+        count = grade_blocks.count()
+        for i in range(count):
+            all_html += grade_blocks.nth(i).inner_html()
 
         browser.close()
-        return content
+        return clean_content(all_html)
 
 def hash_content(content):
-    return hashlib.sha256(content.encode('utf-8')).hexdigest()
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 def main():
     try:
@@ -79,12 +80,12 @@ def main():
                 last_hash = current_hash
 
             elif current_hash != last_hash:
-                send_telegram_notification("🔔 Page content has changed!")
+                send_telegram_notification("🔔 A new grade may have been added!")
                 with open("last_hash.txt", "w") as f:
                     f.write(current_hash)
                 last_hash = current_hash
             else:
-                print("✅ No change detected.")
+                print("✅ No new grade detected.")
 
         except Exception:
             error_message = f"⚠️ Error:\n{traceback.format_exc()}"
